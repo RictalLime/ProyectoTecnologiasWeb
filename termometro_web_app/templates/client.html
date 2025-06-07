@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Termómetros</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Dashboard de Termómetros en Tiempo Real</h1>
+        <nav>
+            <a href="/admin">Administrar</a>
+            <a href="/client">Cliente (Gráficos)</a>
+            <a href="/history">Historial</a>
+        </nav>
+
+        <section id="thermometerGraphs" class="section graph-section">
+            <p id="noThermometersMessage">No hay termómetros activos. Por favor, añádelos desde la página de <a href="/admin">Administración</a>.</p>
+        </section>
+    </div>
+
+    <script>
+        const chartInstances = {}; // Almacena las instancias de Chart.js
+        const MAX_DATA_POINTS = 60; // Mostrar los últimos 60 segundos de datos
+
+        // Umbrales de temperatura (deben coincidir con el backend para la lógica de color)
+        const TEMP_THRESHOLD_HIGH = 45.0;
+        const TEMP_THRESHOLD_LOW = 15.0;
+
+        document.addEventListener('DOMContentLoaded', setupClientDashboard);
+
+        async function setupClientDashboard() {
+            console.log("DOM cargado. Configurando dashboard del cliente.");
+            await fetchAndRenderThermometers();
+            // Actualizar los gráficos y botones cada segundo
+            setInterval(updateAllThermometerGraphs, 1000);
+        }
+
+        async function fetchAndRenderThermometers() {
+            console.log("Obteniendo y renderizando termómetros...");
+            try {
+                const response = await fetch('/api/thermometers');
+                const thermometers = await response.json();
+                const graphsContainer = document.getElementById('thermometerGraphs');
+                graphsContainer.innerHTML = ''; // Limpiar gráficos existentes
+
+                if (thermometers.length === 0) {
+                    graphsContainer.innerHTML = '<p id="noThermometersMessage">No hay termómetros activos. Por favor, añádelos desde la página de <a href="/admin">Administración</a>.</p>';
+                    console.log("No hay termómetros registrados.");
+                    return;
+                }
+
+                document.getElementById('noThermometersMessage')?.remove(); // Eliminar mensaje si hay termómetros
+
+                for (const thermo of thermometers) {
+                    console.log(`Creando tarjeta para termómetro: ${thermo.name} (ID: ${thermo.id})`);
+                    // Crear contenedor para cada termómetro
+                    const thermoDiv = document.createElement('div');
+                    thermoDiv.className = 'thermometer-card';
+                    thermoDiv.innerHTML = `
+                        <h2>${thermo.name} (ID: ${thermo.id})</h2>
+                        <p>Última Temp: <span id="temp-${thermo.id}">N/A</span>°C | Última Hum: <span id="hum-${thermo.id}">N/A</span>%</p>
+                        <div class="chart-container">
+                            <canvas id="chart-temp-${thermo.id}" width="300" height="150"></canvas>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="chart-hum-${thermo.id}" width="300" height="150"></canvas>
+                        </div>
+                        <button id="btn-level-${thermo.id}" class="temp-control-btn" data-thermometer-id="${thermo.id}">Nivelar a 28°C</button>
+                    `;
+                    graphsContainer.appendChild(thermoDiv);
+
+                    // Inicializar gráficos
+                    const tempCtx = document.getElementById(`chart-temp-${thermo.id}`).getContext('2d');
+                    if (tempCtx) {
+                        chartInstances[`temp-${thermo.id}`] = new Chart(tempCtx, {
+                            type: 'line',
+                            data: {
+                                labels: [],
+                                datasets: [{
+                                    label: 'Temperatura (°C)',
+                                    data: [],
+                                    borderColor: 'rgb(255, 99, 132)',
+                                    backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                                    tension: 0.1,
+                                    fill: false
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false, // Permitir que la altura del CSS controle
+                                animation: { duration: 0 }, // Deshabilitar animación para actualización rápida
+                                scales: {
+                                    x: {
+                                        title: { display: true, text: 'Hora' }
+                                    },
+                                    y: {
+                                        beginAtZero: false,
+                                        title: { display: true, text: 'Temperatura (°C)' },
+                                        min: 0, // Rango de temperatura de 0 a 65
+                                        max: 65
+                                    }
+                                }
+                            }
+                        });
+                        console.log(`Gráfico de temperatura para ID ${thermo.id} inicializado.`);
+                    } else {
+                        console.error(`ERROR: No se pudo obtener el contexto 2D para chart-temp-${thermo.id}`);
+                    }
+
+
+                    const humCtx = document.getElementById(`chart-hum-${thermo.id}`).getContext('2d');
+                    if (humCtx) {
+                        chartInstances[`hum-${thermo.id}`] = new Chart(humCtx, {
+                            type: 'line',
+                            data: {
+                                labels: [],
+                                datasets: [{
+                                    label: 'Humedad (%)',
+                                    data: [],
+                                    borderColor: 'rgb(54, 162, 235)',
+                                    backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                                    tension: 0.1,
+                                    fill: false
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false, // Permitir que la altura del CSS controle
+                                animation: { duration: 0 }, // Deshabilitar animación para actualización rápida
+                                scales: {
+                                    x: {
+                                        title: { display: true, text: 'Hora' }
+                                    },
+                                    y: {
+                                        beginAtZero: true,
+                                        title: { display: true, text: 'Humedad (%)' },
+                                        min: 0, // Rango de humedad de 0 a 100
+                                        max: 100
+                                    }
+                                }
+                            }
+                        });
+                        console.log(`Gráfico de humedad para ID ${thermo.id} inicializado.`);
+                    } else {
+                        console.error(`ERROR: No se pudo obtener el contexto 2D para chart-hum-${thermo.id}`);
+                    }
+
+
+                    // Añadir listener al botón
+                    const levelButton = document.getElementById(`btn-level-${thermo.id}`);
+                    if (levelButton) {
+                        levelButton.addEventListener('click', () => levelTemperature(thermo.id));
+                    }
+                }
+            } catch (error) {
+                console.error('ERROR: Error al cargar termómetros para el dashboard:', error);
+                graphsContainer.innerHTML = '<p class="error">Error al cargar el dashboard. Inténtalo de nuevo.</p>';
+            }
+        }
+
+        async function updateAllThermometerGraphs() {
+            try {
+                const response = await fetch('/api/readings/latest');
+                const latestReadings = await response.json();
+
+                if (latestReadings.length === 0) {
+                    // No hay lecturas todavía, o no hay termómetros
+                    return;
+                }
+
+                latestReadings.forEach(reading => {
+                    const thermoId = reading.thermometer_id;
+                    const timestamp = new Date(reading.timestamp).toLocaleTimeString(); // Formato HH:MM:SS
+                    const currentTemp = reading.temperature;
+
+                    // Actualizar última lectura mostrada
+                    const lastTempSpan = document.getElementById(`temp-${thermoId}`);
+                    const lastHumSpan = document.getElementById(`hum-${thermoId}`);
+                    if (lastTempSpan) lastTempSpan.innerText = currentTemp.toFixed(2);
+                    if (lastHumSpan) lastHumSpan.innerText = reading.humidity.toFixed(2);
+
+                    // Actualizar color del botón
+                    const levelButton = document.getElementById(`btn-level-${thermoId}`);
+                    if (levelButton) {
+                        levelButton.classList.remove('temp-btn-red', 'temp-btn-blue', 'temp-btn-green');
+                        if (currentTemp > TEMP_THRESHOLD_HIGH) {
+                            levelButton.classList.add('temp-btn-red');
+                        } else if (currentTemp < TEMP_THRESHOLD_LOW) {
+                            levelButton.classList.add('temp-btn-blue');
+                        } else {
+                            levelButton.classList.add('temp-btn-green');
+                        }
+                    }
+
+                    // Actualizar gráfico de temperatura
+                    const tempChart = chartInstances[`temp-${thermoId}`];
+                    if (tempChart) {
+                        tempChart.data.labels.push(timestamp);
+                        tempChart.data.datasets[0].data.push(currentTemp);
+
+                        // Mantener solo los últimos MAX_DATA_POINTS
+                        if (tempChart.data.labels.length > MAX_DATA_POINTS) {
+                            tempChart.data.labels.shift();
+                            tempChart.data.datasets[0].data.shift();
+                        }
+                        tempChart.update();
+                    }
+
+                    // Actualizar gráfico de humedad
+                    const humChart = chartInstances[`hum-${thermoId}`];
+                    if (humChart) {
+                        humChart.data.labels.push(timestamp);
+                        humChart.data.datasets[0].data.push(reading.humidity);
+
+                        // Mantener solo los últimos MAX_DATA_POINTS
+                        if (humChart.data.labels.length > MAX_DATA_POINTS) {
+                            humChart.data.labels.shift();
+                            humChart.data.datasets[0].data.shift();
+                        }
+                        humChart.update();
+                    }
+                });
+            } catch (error) {
+                console.error('ERROR: Error al actualizar gráficos:', error);
+            }
+        }
+
+        async function levelTemperature(thermometerId) {
+            console.log(`Nivelando temperatura para termómetro ID: ${thermometerId}`);
+            try {
+                const response = await fetch(`/api/thermometers/${thermometerId}/level`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    console.log(result.message);
+                    // No es necesario actualizar el gráfico inmediatamente, el setInterval lo hará en 1 segundo
+                } else {
+                    console.error('ERROR al nivelar temperatura:', result.error);
+                }
+            } catch (error) {
+                console.error('ERROR de conexión al nivelar temperatura:', error);
+            }
+        }
+    </script>
+</body>
+</html>
