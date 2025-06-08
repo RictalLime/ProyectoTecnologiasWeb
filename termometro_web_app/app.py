@@ -7,6 +7,8 @@ import time
 import random
 import os
 from flask_cors import CORS
+from clientemqtt import start_mqtt, mqtt_queue
+
 
 app = Flask(__name__)
 CORS(app)
@@ -262,6 +264,22 @@ def stop_simulation():
         if simulation_thread and simulation_thread.is_alive():
             simulation_thread.join(timeout=2)
         print("Simulación de lecturas detenida.")
+
+import threading
+
+def process_mqtt_messages():
+    while True:
+        if not mqtt_queue.empty():
+            mensaje = mqtt_queue.get()
+            print(f"[Flask] Procesando mensaje MQTT: {mensaje}")
+            # Aquí puedes guardar el mensaje en la base de datos
+            # guardar_en_db(float(mensaje))
+        time.sleep(1)
+
+# Iniciar MQTT y el procesador de mensajes
+start_mqtt()
+threading.Thread(target=process_mqtt_messages, daemon=True).start()
+
 
 # Inicializar la base de datos y comenzar la simulación al iniciar la aplicación
 if __name__ == '__main__':
