@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Historial de Lecturas</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Historial Completo de Lecturas</h1>
+        <nav>
+            <a href="/admin">Administrar</a>
+            <a href="/client">Cliente (Gráficos)</a>
+            <a href="/history">Historial</a>
+        </nav>
+
+        <section class="section">
+            <table id="readingsTable">
+                <thead>
+                    <tr>
+                        <th>Fecha y Hora</th>
+                        <th>Termómetro</th>
+                        <th>Temperatura (°C)</th>
+                        <th>Humedad (%)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    </tbody>
+            </table>
+            <p id="noReadingsMessage" style="display: none;">No hay registros de lecturas todavía.</p>
+        </section>
+    </div>
+
+    <script>
+        // Umbrales de temperatura (deben coincidir con el backend)
+        const TEMP_THRESHOLD_HIGH = 45.0;
+        const TEMP_THRESHOLD_LOW = 15.0;
+
+        document.addEventListener('DOMContentLoaded', fetchAllReadings);
+
+        async function fetchAllReadings() {
+            try {
+                const response = await fetch('/api/readings/all');
+                const readings = await response.json();
+                const tableBody = document.getElementById('readingsTable').getElementsByTagName('tbody')[0];
+                const noReadingsMessage = document.getElementById('noReadingsMessage');
+                tableBody.innerHTML = ''; // Limpiar tabla
+
+                if (readings.length === 0) {
+                    noReadingsMessage.style.display = 'block';
+                    return;
+                } else {
+                    noReadingsMessage.style.display = 'none';
+                }
+
+                readings.forEach(reading => {
+                    const row = tableBody.insertRow();
+                    row.insertCell().textContent = reading.timestamp;
+                    row.insertCell().textContent = reading.name;
+                    
+                    const tempCell = row.insertCell();
+                    tempCell.textContent = reading.temperature.toFixed(2);
+                    // Aplicar clase de color a la celda de temperatura
+                    if (reading.temperature > TEMP_THRESHOLD_HIGH) {
+                        tempCell.classList.add('temp-red');
+                    } else if (reading.temperature < TEMP_THRESHOLD_LOW) {
+                        tempCell.classList.add('temp-blue');
+                    } else {
+                        tempCell.classList.add('temp-green');
+                    }
+
+                    row.insertCell().textContent = reading.humidity.toFixed(2);
+                });
+            } catch (error) {
+                console.error('Error al obtener todas las lecturas:', error);
+                document.getElementById('readingsTable').getElementsByTagName('tbody')[0].innerHTML = '<tr><td colspan="4" class="error">Error al cargar el historial.</td></tr>';
+            }
+        }
+    </script>
+</body>
+</html>

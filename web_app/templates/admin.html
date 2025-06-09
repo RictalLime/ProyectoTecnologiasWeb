@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Administración de Termómetros</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Administración de Termómetros</h1>
+        <nav>
+            <a href="/admin">Administrar</a>
+            <a href="/client">Cliente (Gráficos)</a>
+            <a href="/history">Historial</a>
+        </nav>
+
+        <section class="section">
+            <h2>Añadir Nuevo Termómetro</h2>
+            <form id="addThermometerForm">
+                <input type="text" id="thermometerName" placeholder="Nombre del Termómetro" required>
+                <button type="submit">Añadir Termómetro</button>
+            </form>
+            <p id="addMessage" class="message"></p>
+        </section>
+
+        <section class="section">
+            <h2>Termómetros Existentes</h2>
+            <table id="thermometersTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nombre</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    </tbody>
+            </table>
+            <p id="deleteMessage" class="message"></p>
+        </section>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', fetchThermometers);
+
+        async function fetchThermometers() {
+            try {
+                const response = await fetch('/api/thermometers');
+                const thermometers = await response.json();
+                const tableBody = document.getElementById('thermometersTable').getElementsByTagName('tbody')[0];
+                tableBody.innerHTML = ''; // Limpiar tabla
+
+                if (thermometers.length === 0) {
+                    tableBody.innerHTML = '<tr><td colspan="3">No hay termómetros registrados.</td></tr>';
+                    return;
+                }
+
+                thermometers.forEach(thermometer => {
+                    const row = tableBody.insertRow();
+                    row.insertCell().textContent = thermometer.id;
+                    row.insertCell().textContent = thermometer.name;
+                    const actionsCell = row.insertCell();
+                    const deleteButton = document.createElement('button');
+                    deleteButton.textContent = 'Eliminar';
+                    deleteButton.className = 'delete-btn';
+                    deleteButton.onclick = () => deleteThermometer(thermometer.id);
+                    actionsCell.appendChild(deleteButton);
+                });
+            } catch (error) {
+                console.error('Error al obtener termómetros:', error);
+                document.getElementById('addMessage').textContent = 'Error al cargar termómetros.';
+                document.getElementById('addMessage').className = 'message error';
+            }
+        }
+
+        document.getElementById('addThermometerForm').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const name = document.getElementById('thermometerName').value;
+            const messageDiv = document.getElementById('addMessage');
+
+            try {
+                const response = await fetch('/api/thermometers', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: name })
+                });
+                const result = await response.json();
+
+                if (response.ok) {
+                    messageDiv.textContent = result.message;
+                    messageDiv.className = 'message success';
+                    document.getElementById('thermometerName').value = ''; // Limpiar campo
+                    fetchThermometers(); // Actualizar la lista
+                } else {
+                    messageDiv.textContent = result.error || 'Error al añadir termómetro.';
+                    messageDiv.className = 'message error';
+                }
+            } catch (error) {
+                console.error('Error al añadir termómetro:', error);
+                messageDiv.textContent = 'Error de conexión al añadir termómetro.';
+                messageDiv.className = 'message error';
+            }
+        });
+
+        async function deleteThermometer(id) {
+            const messageDiv = document.getElementById('deleteMessage');
+            if (!confirm('¿Estás seguro de que quieres eliminar este termómetro y todos sus registros?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/thermometers/${id}`, {
+                    method: 'DELETE'
+                });
+                const result = await response.json();
+
+                if (response.ok) {
+                    messageDiv.textContent = result.message;
+                    messageDiv.className = 'message success';
+                    fetchThermometers(); // Actualizar la lista
+                } else {
+                    messageDiv.textContent = result.error || 'Error al eliminar termómetro.';
+                    messageDiv.className = 'message error';
+                }
+            } catch (error) {
+                console.error('Error al eliminar termómetro:', error);
+                messageDiv.textContent = 'Error de conexión al eliminar termómetro.';
+                messageDiv.className = 'message error';
+            }
+        }
+    </script>
+</body>
+</html>

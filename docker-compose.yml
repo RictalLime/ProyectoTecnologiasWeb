@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  web_app:
+    build:
+      context: ./web_app
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./base_datos:/app/base_datos
+    networks:
+      - mqttnet
+
+  cliente:
+    build:
+      context: ./cliente
+    depends_on:
+      - mosquitto
+    networks:
+      - mqttnet
+
+  servidor:
+    build:
+      context: ./servidor
+    depends_on:
+      - mosquitto
+    networks:
+      - mqttnet
+
+  mosquitto:
+    image: eclipse-mosquitto
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
+    networks:
+      - mqttnet
+
+networks:
+  mqttnet:
