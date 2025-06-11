@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Iniciar Sesión</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .login-form {
+            max-width: 350px;
+            margin: 60px auto;
+            background: #fff;
+            padding: 30px 25px;
+            border-radius: 12px;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.10);
+            border: 1px solid #cce7ee;
+        }
+        .login-form h2 {
+            text-align: center;
+            margin-bottom: 25px;
+            color: #2196f3;
+        }
+        .login-form input[type="text"],
+        .login-form input[type="password"] {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 18px;
+            border: 1px solid #b3e5fc;
+            border-radius: 8px;
+            font-size: 1em;
+        }
+        .login-form button {
+            width: 100%;
+        }
+        .login-form .message {
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <form class="login-form" method="POST" action="/login">
+        <h2>Iniciar Sesión</h2>
+        {% if error %}
+            <div class="message error">{{ error }}</div>
+        {% endif %}
+        <input type="text" name="username" placeholder="Usuario" required autofocus>
+        <input type="password" name="password" placeholder="Contraseña" required>
+        <button type="submit">Entrar</button>
+    </form>
+</body>
+</html>

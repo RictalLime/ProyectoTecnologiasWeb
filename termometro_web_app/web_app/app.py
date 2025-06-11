@@ -1,5 +1,5 @@
 # app.py
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, redirect, url_for, session
 import sqlite3
 from datetime import datetime, timedelta
 import time
@@ -9,6 +9,7 @@ from flask_cors import CORS
 import threading
 
 app = Flask(__name__)
+app.secret_key = 'supersecretkey'  # Cambia esto en producción
 CORS(app)
 DATABASE = 'base_datos/sensor_data.db'
 SIMULATION_INTERVAL_SECONDS = 1 # Intervalo de simulación de lecturas (cada segundo)
@@ -118,22 +119,54 @@ def simulate_readings():
 
 @app.route('/')
 def home():
-    """Redirige a la página de cliente por defecto."""
-    return render_template('client.html')
+    """Redirige al login si no está autenticado, si no, va a admin."""
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+    return redirect(url_for('admin_page'))
 
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """Página de login para el usuario admin."""
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        if username == 'admin' and password == 'admin':
+            session['logged_in'] = True
+            return redirect(url_for('admin_page'))
+        else:
+            return render_template('login.html', error="Usuario o contraseña incorrectos.")
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    """Cerrar sesión."""
+    session.pop('logged_in', None)
+    return redirect(url_for('login'))
+
+from functools import wraps
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('logged_in'):
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+# Proteger las páginas de administración y cliente
 @app.route('/admin')
+@login_required
 def admin_page():
-    """Página de administración para gestionar termómetros."""
     return render_template('admin.html')
 
 @app.route('/client')
+@login_required
 def client_page():
-    """Página de cliente para ver gráficos en tiempo real."""
     return render_template('client.html')
 
 @app.route('/history')
+@login_required
 def history_page():
-    """Página para ver el historial completo de lecturas."""
     return render_template('history.html')
 
 # --- API Endpoints para la gestión de termómetros ---
@@ -262,8 +295,6 @@ def stop_simulation():
         if simulation_thread and simulation_thread.is_alive():
             simulation_thread.join(timeout=2)
         print("Simulación de lecturas detenida.")
-
-
 
 
 # Inicializar la base de datos y comenzar la simulación al iniciar la aplicación
