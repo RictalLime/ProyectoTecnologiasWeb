@@ -21,7 +21,7 @@ Este proyecto implementa un sistema de monitoreo de temperatura utilizando Docke
 
 ```bash
 git clone https://github.com/RictalLime/ProyectoTecnologiasWeb
-cd ProyectoTecnologiasWeb
+cd ProyectoTecnologiasWeb/termometro_web_app
 ```
 
 ### Construir y ejecutar los contenedores
